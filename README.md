@@ -45,10 +45,13 @@ ai-datalab/
 │   │   └── data_analysis.py  # Pandas-based data operations
 │   ├── data/             # CSV files for analysis
 │   └── main.py           # FastAPI application
-├── src/
-│   ├── components/       # React components
-│   ├── hooks/            # Custom hooks (useSSE)
-│   └── App.tsx           # Main application
+├── frontend/
+│   ├── src/
+│   │   ├── components/   # React components
+│   │   ├── hooks/        # Custom hooks (useSSE)
+│   │   └── App.tsx       # Main application
+│   ├── package.json      # Frontend dependencies
+│   └── vite.config.ts    # Vite configuration
 └── ...
 ```
 
@@ -62,6 +65,7 @@ ai-datalab/
 ### Frontend
 
 ```bash
+cd frontend
 npm install
 npm run dev
 ```
@@ -97,6 +101,7 @@ Backend runs on `http://localhost:8000`
 ## Build
 
 ```bash
+cd frontend
 npm run build
 ```
 
