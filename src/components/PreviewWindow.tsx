@@ -1,24 +1,72 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { RefreshCw, Maximize2 } from 'lucide-react'
 import { Button } from './ui/Button'
+import { useSSE } from '@/hooks/useSSE'
 
 interface PreviewWindowProps {
-  url?: string
+  sessionId?: string | null
 }
 
-export function PreviewWindow({ url }: PreviewWindowProps) {
-  const defaultUrl = url || 'about:blank'
-  const [iframeKey, setIframeKey] = useState(0)
+const API_BASE_URL = 'http://localhost:8000'
+
+export function PreviewWindow({ sessionId }: PreviewWindowProps) {
+  const [htmlContent, setHtmlContent] = useState<string>('')
   const [isLoading, setIsLoading] = useState(true)
+  const iframeRef = useRef<HTMLIFrameElement>(null)
 
   const handleRefresh = () => {
-    setIframeKey((prev) => prev + 1)
+    if (iframeRef.current) {
+      iframeRef.current.contentWindow?.location.reload()
+    }
     setIsLoading(true)
   }
 
+  // SSE connection for real-time updates
+  const sseUrl = sessionId ? `${API_BASE_URL}/api/stream/${sessionId}` : null
+
+  useSSE(
+    sseUrl,
+    (message) => {
+      if (message.event === 'preview' && message.data.html) {
+        setHtmlContent(message.data.html)
+        setIsLoading(false)
+        
+        // Update iframe content
+        if (iframeRef.current && iframeRef.current.contentDocument) {
+          iframeRef.current.contentDocument.open()
+          iframeRef.current.contentDocument.write(message.data.html)
+          iframeRef.current.contentDocument.close()
+        }
+      } else if (message.event === 'status') {
+        // Could show status updates in the UI
+        console.log('Status:', message.data.message)
+      } else if (message.event === 'complete') {
+        setIsLoading(false)
+      } else if (message.event === 'error') {
+        console.error('Error from backend:', message.data.message)
+        setIsLoading(false)
+      }
+    },
+    (error) => {
+      console.error('SSE connection error:', error)
+    }
+  )
+
+  // Create blob URL for iframe when htmlContent changes
   useEffect(() => {
-    setIsLoading(true)
-  }, [defaultUrl])
+    if (htmlContent && iframeRef.current) {
+      const blob = new Blob([htmlContent], { type: 'text/html' })
+      const url = URL.createObjectURL(blob)
+      
+      if (iframeRef.current.src !== url) {
+        iframeRef.current.src = url
+      }
+      
+      return () => {
+        URL.revokeObjectURL(url)
+      }
+    }
+  }, [htmlContent])
 
   return (
     <div className="flex flex-col h-full bg-background">
@@ -58,8 +106,7 @@ export function PreviewWindow({ url }: PreviewWindowProps) {
           </div>
         )}
         <iframe
-          key={iframeKey}
-          src={defaultUrl}
+          ref={iframeRef}
           className="w-full h-full border-0"
           title="Preview"
           onLoad={() => setIsLoading(false)}

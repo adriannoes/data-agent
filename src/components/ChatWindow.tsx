@@ -10,7 +10,9 @@ interface Message {
   timestamp: Date
 }
 
-export function ChatWindow() {
+const API_BASE_URL = 'http://localhost:8000'
+
+export function ChatWindow({ onSessionChange }: { onSessionChange?: (sessionId: string) => void }) {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
@@ -21,6 +23,7 @@ export function ChatWindow() {
   ])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [sessionId, setSessionId] = useState<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   const scrollToBottom = () => {
@@ -42,20 +45,58 @@ export function ChatWindow() {
     }
 
     setMessages((prev) => [...prev, userMessage])
+    const currentInput = input
     setInput('')
     setIsLoading(true)
 
-    // Simulação de resposta da IA
-    setTimeout(() => {
+    try {
+      // Call backend API
+      const response = await fetch(`${API_BASE_URL}/api/chat`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: currentInput,
+          session_id: sessionId,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to get response from API')
+      }
+
+      const data = await response.json()
+      
+      // Update session ID if new
+      if (data.session_id) {
+        if (!sessionId) {
+          setSessionId(data.session_id)
+        }
+        if (onSessionChange) {
+          onSessionChange(data.session_id)
+        }
+      }
+
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: 'Analisando seus dados... Esta é uma resposta de exemplo. Em produção, aqui viria a análise real dos dados.',
+        content: data.response,
         timestamp: new Date(),
       }
       setMessages((prev) => [...prev, assistantMessage])
+    } catch (error) {
+      console.error('Error sending message:', error)
+      const errorMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: 'Desculpe, ocorreu um erro ao processar sua mensagem. Verifique se o backend está rodando.',
+        timestamp: new Date(),
+      }
+      setMessages((prev) => [...prev, errorMessage])
+    } finally {
       setIsLoading(false)
-    }, 1000)
+    }
   }
 
   const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
